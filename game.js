@@ -28,8 +28,10 @@ function generateTrackPoints(numPoints, radius, centerX, centerY) {
     car.x = points[4].x;
     car.y = points[4].y;
     car.angle=0;
-    spawn_x = car.x;
-    spawn_y = car.y;
+    car.speed = 0;
+    car.accel=0;
+    car.spawn_x = car.x;
+    car.spawn_y = car.y;
 
 
     return points;
@@ -52,41 +54,47 @@ function drawTrack(points) {
 // Generate and draw random track
 let trackPoints = generateTrackPoints(20, 300, canvas.width / 2, canvas.height / 2);
 
-// function isCarOnTrack() {
-//     const carCorners = [
-//         { x: car.x + car.width / 2 * Math.cos(car.angle) - car.height / 2 * Math.sin(car.angle),
-//           y: car.y + car.width / 2 * Math.sin(car.angle) + car.height / 2 * Math.cos(car.angle) },
-//         { x: car.x - car.width / 2 * Math.cos(car.angle) - car.height / 2 * Math.sin(car.angle),
-//           y: car.y - car.width / 2 * Math.sin(car.angle) + car.height / 2 * Math.cos(car.angle) },
-//         { x: car.x + car.width / 2 * Math.cos(car.angle) + car.height / 2 * Math.sin(car.angle),
-//           y: car.y + car.width / 2 * Math.sin(car.angle) - car.height / 2 * Math.cos(car.angle) },
-//         { x: car.x - car.width / 2 * Math.cos(car.angle) + car.height / 2 * Math.sin(car.angle),
-//           y: car.y - car.width / 2 * Math.sin(car.angle) - car.height / 2 * Math.cos(car.angle) }
-//     ];
-
-//     for (let corner of carCorners) {
-//         const imageData = ctx.getImageData(corner.x+1, corner.y+1, 1, 1);
-//         const data = imageData.data;
-//         const r = data[0];
-//         const g = data[1];
-//         const b = data[2];
-//         console.log(r)
-//         // Check if pixel is not the track color (black)
-//         if (r === 255 && g === 255 && b === 255) {
-//             return false;
-//         }
-//     }
-//     return true;
-// }
+function isCarOnTrack() {
+    const carCorners = [
+        { x: car.x + car.width / 2 * Math.cos(car.angle) - car.height / 2 * Math.sin(car.angle),
+          y: car.y + car.width / 2 * Math.sin(car.angle) + car.height / 2 * Math.cos(car.angle) },
+        { x: car.x - car.width / 2 * Math.cos(car.angle) - car.height / 2 * Math.sin(car.angle),
+          y: car.y - car.width / 2 * Math.sin(car.angle) + car.height / 2 * Math.cos(car.angle) },
+        { x: car.x + car.width / 2 * Math.cos(car.angle) + car.height / 2 * Math.sin(car.angle),
+          y: car.y + car.width / 2 * Math.sin(car.angle) - car.height / 2 * Math.cos(car.angle) },
+        { x: car.x - car.width / 2 * Math.cos(car.angle) + car.height / 2 * Math.sin(car.angle),
+          y: car.y - car.width / 2 * Math.sin(car.angle) - car.height / 2 * Math.cos(car.angle) }
+    ];
 
 
+    ctx.beginPath();
+    ctx.moveTo(trackPoints[0].x, trackPoints[0].y);
+    for (let i = 1; i < trackPoints.length; i++) {
+        ctx.lineTo(trackPoints[i].x, trackPoints[i].y);
+    }
+    ctx.closePath();
 
+
+    //ctx.fillStyle = 'blue';
+    for (let corner of carCorners) {
+        //ctx.fillRect(corner.x - 2.5, corner.y - 2.5, 5, 5);
+        if (!ctx.isPointInStroke(corner.x, corner.y)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+
+const carImage = new Image()
+carImage.src = 'car-image.png'
 function drawCar() {
     ctx.save();
     ctx.translate(car.x, car.y);
     ctx.rotate(car.angle);
-    ctx.fillStyle = 'red';
-    ctx.fillRect(-car.width / 2, -car.height / 2, car.width, car.height);
+    // ctx.fillStyle = 'red';
+    // ctx.fillRect(-car.width / 2, -car.height / 2, car.width, car.height);
+    ctx.drawImage(carImage, -car.width / 2, -car.height / 2, car.width, car.height)
     ctx.restore();
 }
 
@@ -116,21 +124,23 @@ function gameLoop() {
     drawCar();
     updateCar();
 
-    // if (!isCarOnTrack()) {
-    //     car.x = car.spawn_x;
-    //     car.y = car.spawn_y;
-    //     car.speed = 0;
-    //     car.accel = 0;
-    // }
+    if (!isCarOnTrack()) {
+        car.x = car.spawn_x;
+        car.y = car.spawn_y;
+        car.speed = 0;
+        car.accel = 0;
+        car.angle=0;
 
+    }
+    
     requestAnimationFrame(gameLoop);
 }
 
 document.addEventListener('keydown', (event) => {
-    if (event.key === 'ArrowUp') car.accel = 0.3;
-    if (event.key === 'ArrowDown') car.accel = -0.3;
-    if (event.key === 'ArrowLeft') car.rotateSpeed = -0.2; 
-    if (event.key === 'ArrowRight') car.rotateSpeed = 0.2;
+    if (event.key === 'ArrowUp') car.accel = 0.25;
+    if (event.key === 'ArrowDown') car.accel = -0.25;
+    if (event.key === 'ArrowLeft') car.rotateSpeed = -0.08; 
+    if (event.key === 'ArrowRight') car.rotateSpeed = 0.08;
 });
 
 document.addEventListener('keyup', (event) => {
