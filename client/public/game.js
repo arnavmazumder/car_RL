@@ -2,6 +2,7 @@ const canvas = document.getElementById('gameCanvas');
 const generateTrack = document.getElementById('generate');
 const startCar = document.getElementById('start');
 const ctx = canvas.getContext('2d');
+training = true;
 
 
 let car = {
@@ -38,6 +39,8 @@ function generateTrackPoints(numPoints, radius, centerX, centerY) {
 }
 
 // Draw track
+const finishImage = new Image()
+finishImage.src = 'finish-line.png'
 function drawTrack(points) {
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
@@ -48,6 +51,9 @@ function drawTrack(points) {
     ctx.strokeStyle = 'gray';
     ctx.lineWidth = 70;
     ctx.stroke();
+
+    ctx.drawImage(finishImage, car.spawn_x-10, car.spawn_y-35, 20, 70)
+
 }
 
 
@@ -130,7 +136,6 @@ function gameLoop() {
         car.speed = 0;
         car.accel = 0;
         car.angle=0;
-
     }
     
     requestAnimationFrame(gameLoop);
@@ -152,7 +157,11 @@ document.addEventListener('keyup', (event) => {
 });
 
 generateTrack.addEventListener('click', () => {
-    trackPoints = generateTrackPoints(20, 300, canvas.width / 2, canvas.height / 2);
+    if (!training) {
+        trackPoints = generateTrackPoints(20, 300, canvas.width / 2, canvas.height / 2);
+    } else {
+        console.log("Currently in Training Mode")
+    }
 });
 
 startCar.addEventListener('click', () => {
