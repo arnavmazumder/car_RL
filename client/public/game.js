@@ -1,9 +1,15 @@
-const canvas = document.getElementById('gameCanvas');
-const generateTrack = document.getElementById('generate');
-const startCar = document.getElementById('start');
-const ctx = canvas.getContext('2d');
-training = true;
+//Document constants
 
+const canvas = document.getElementById('gameCanvas');
+const generateTrackButton = document.getElementById('generate');
+const startAIButton = document.getElementById('start');
+const trainStopButton = document.getElementById('trainStop')
+const ctx = canvas.getContext('2d', {willReadFrequently: true});
+
+// UI state variables
+training = false;
+aiRunning = false;
+playerRunning = true;
 
 let car = {
     x: 100,
@@ -17,6 +23,9 @@ let car = {
     spawn_x: 0,
     spawn_y: 0
 };
+
+
+// Track functions
 
 function generateTrackPoints(numPoints, radius, centerX, centerY) {
     let points = [];
@@ -38,6 +47,9 @@ function generateTrackPoints(numPoints, radius, centerX, centerY) {
     return points;
 }
 
+// Generate random track
+let trackPoints = generateTrackPoints(20, 300, canvas.width / 2, canvas.height / 2);
+
 // Draw track
 const finishImage = new Image()
 finishImage.src = 'finish-line.png'
@@ -55,10 +67,6 @@ function drawTrack(points) {
     ctx.drawImage(finishImage, car.spawn_x-10, car.spawn_y-35, 20, 70)
 
 }
-
-
-// Generate and draw random track
-let trackPoints = generateTrackPoints(20, 300, canvas.width / 2, canvas.height / 2);
 
 function isCarOnTrack() {
     const carCorners = [
@@ -92,6 +100,8 @@ function isCarOnTrack() {
 }
 
 
+// Car functions
+
 const carImage = new Image()
 carImage.src = 'car-image.png'
 function drawCar() {
@@ -123,52 +133,107 @@ function updateCar() {
     car.y += Math.sin(car.angle) * car.speed;
 }
 
+function initCar() {
+    car.x = car.spawn_x;
+    car.y = car.spawn_y;
+    car.speed = 0;
+    car.accel = 0;
+    car.angle=0;
+}
 
-function gameLoop() {
+async function sendState() {
+    try {
+        const args = {carPosX: car.x, carPosY: car.y, carSpeed: car.speed, carAngle: car.angle, track: trackPoints};
+        const resp = await fetch('/api/sendState', {
+                                method: 'POST',
+                                body: JSON.stringify(args),
+                                headers: new Headers({'Content-Type': 'application/json'})
+                            })
+        if (!resp.ok) console.error("Status " + resp.status + ": " + resp.statusText)
+    } catch(error) {
+        console.error(`Fetch error for /api/sendState:`, error);
+    }
+} 
+
+
+// Main game loop
+let counter = 1n;
+async function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawTrack(trackPoints);
     drawCar();
     updateCar();
-
-    if (!isCarOnTrack()) {
-        car.x = car.spawn_x;
-        car.y = car.spawn_y;
-        car.speed = 0;
-        car.accel = 0;
-        car.angle=0;
-    }
-    
+    if (!isCarOnTrack()) initCar();
     requestAnimationFrame(gameLoop);
+
+    if (counter%100n == 0n) {
+        console.log("50 ticks")
+        if (training) {
+
+
+        } else if (aiRunning) {
+
+        }
+
+        counter = 1n
+    }
+    counter += 1n
 }
 
+
+
+
+// Event listeners
+
 document.addEventListener('keydown', (event) => {
-    if (event.key === 'ArrowUp') car.accel = 0.25;
-    if (event.key === 'ArrowDown') car.accel = -0.25;
-    if (event.key === 'ArrowLeft') car.rotateSpeed = -0.08; 
-    if (event.key === 'ArrowRight') car.rotateSpeed = 0.08;
+    if (playerRunning) {
+        if (event.key === 'ArrowUp') car.accel = 0.25;
+        if (event.key === 'ArrowDown') car.accel = -0.25;
+        if (event.key === 'ArrowLeft') car.rotateSpeed = -0.06; 
+        if (event.key === 'ArrowRight') car.rotateSpeed = 0.06;
+    }
 });
 
 document.addEventListener('keyup', (event) => {
-    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-        car.accel=0;
+    if (playerRunning) {
+        if (event.key === 'ArrowUp' || event.key === 'ArrowDown') car.accel=0;
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') car.rotateSpeed = 0;
     }
-
-    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') car.rotateSpeed = 0;
 });
 
-generateTrack.addEventListener('click', () => {
-    if (!training) {
+generateTrackButton.addEventListener('click', () => {
+    if (playerRunning) {
         trackPoints = generateTrackPoints(20, 300, canvas.width / 2, canvas.height / 2);
-    } else {
-        console.log("Currently in Training Mode")
     }
 });
 
-startCar.addEventListener('click', () => {
-    console.log(isCarOnTrack());
+startAIButton.addEventListener('click', () => {
+    if (!training) {
+        aiRunning = !aiRunning;
+        playerRunning = !aiRunning;
+        startAIButton.textContent = (aiRunning) ? 'Stop AI (DQN)' : 'Start AI (DQN)';
+        initCar();
+    }
 });
 
+trainStopButton.addEventListener('click', () => {
+    if (!aiRunning) {
+        // UI Update
+        training = !training;
+        playerRunning = !training;
+        trainStopButton.textContent = (training) ? 'Stop' : 'Train';
+        initCar();
+
+        sendState();
+
+        if (training) {
+            //Start SERVER Training
+        } else {
+            //Stop Server Training
+        }
+    }
+})
 
 
-
+// Main
 gameLoop();

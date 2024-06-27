@@ -1,10 +1,12 @@
-from flask import Flask
+from flask import Flask, request
 
 app = Flask(__name__)
 
-@app.route('/')
-def test():
-    return {"test": 'Hello'}
+@app.route('/api/sendState', methods=['POST'])
+def receiveState():
+    raw = request.get_json()
+    print(raw)
+    return {'msg': 'success'}
 
 
 if __name__== '__main__':
