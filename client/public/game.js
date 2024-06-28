@@ -7,21 +7,22 @@ const trainStopButton = document.getElementById('trainStop')
 const ctx = canvas.getContext('2d', {willReadFrequently: true});
 
 // UI state variables
-training = false;
+clientTraining = false;
+serverTraining = false;
 aiRunning = false;
 playerRunning = true;
 
 let car = {
-    x: 100,
-    y: 100,
+    x: 100.0,
+    y: 100.0,
     width: 25,
     height: 15,
-    speed: 0,
-    angle: 0,
-    rotateSpeed: 0,
-    accel: 0,
-    spawn_x: 0,
-    spawn_y: 0
+    speed: 0.0,
+    angle: 0.0,
+    rotateSpeed: 0.0,
+    accel: 0.0,
+    spawn_x: 0.0,
+    spawn_y: 0.0
 };
 
 
@@ -37,9 +38,9 @@ function generateTrackPoints(numPoints, radius, centerX, centerY) {
     }
     car.x = points[4].x;
     car.y = points[4].y;
-    car.angle=0;
-    car.speed = 0;
-    car.accel=0;
+    car.angle=0.0;
+    car.speed = 0.0;
+    car.accel=0.0;
     car.spawn_x = car.x;
     car.spawn_y = car.y;
 
@@ -136,40 +137,74 @@ function updateCar() {
 function initCar() {
     car.x = car.spawn_x;
     car.y = car.spawn_y;
-    car.speed = 0;
-    car.accel = 0;
-    car.angle=0;
+    car.speed = 0.0;
+    car.accel = 0.0;
+    car.angle=0.0;
+    car.rotateSpeed=0.0;
 }
 
-async function sendState() {
+// Async/fetch functions
+
+// sends the game state to the server agent and return the next action
+async function sendState(reward) {
     try {
-        const args = {carPosX: car.x, carPosY: car.y, carSpeed: car.speed, carAngle: car.angle, track: trackPoints};
+        const args = {carPosX: car.x, carPosY: car.y, carSpeed: car.speed, carAngle: car.angle, track: trackPoints, reward: reward};
         const resp = await fetch('/api/sendState', {
                                 method: 'POST',
                                 body: JSON.stringify(args),
                                 headers: new Headers({'Content-Type': 'application/json'})
                             })
+
         if (!resp.ok) console.error("Status " + resp.status + ": " + resp.statusText)
+
+        data = await resp.json();
+        if (data === null || typeof data !== "object") throw Error("Invalid response.");
+        
+        //actions are in the form of KeyDirection
+        if (data.action !== 'UpUp' && data.action !== 'UpDown' && data.action !== 'UpRight' && data.action !== 'UpLeft' && data.action !== 'DownUp' && data.action !== 'DownDown' && data.action !== 'DownRight' && data.action !== 'DownLeft' && data.action !== 'None') { 
+            throw Error("Invalid response: " + data.action) 
+        }
+
+        return data.action;
+
     } catch(error) {
         console.error(`Fetch error for /api/sendState:`, error);
     }
+}
+
+
+// Training Simulation Functions
+
+function executeAction(action) {
+    if (action === 'DownUp') car.accel = 0.25;
+    if (action === 'DownDown') car.accel = -0.25;
+    if (action === 'DownLeft') car.rotateSpeed = -0.06;
+    if (action === 'DownRight') car.rotateSpeed = 0.06;
+    if (action === 'UpUp' || action === 'UpDown') car.accel=0;
+    if (action === 'UpLeft' || action === 'UpRight') car.rotateSpeed = 0;
 } 
 
+function observeReward() {
+    const r = 1.1; //TODO
+    return r;
+
+}
 
 // Main game loop
 let counter = 1n;
+let newAction;
+let currReward;
 async function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawTrack(trackPoints);
     drawCar();
-    updateCar();
-    if (!isCarOnTrack()) initCar();
-    requestAnimationFrame(gameLoop);
-
+    
     if (counter%100n == 0n) {
-        console.log("50 ticks")
-        if (training) {
-
+        //console.log("100 ticks")
+        if (serverTraining) {
+            currReward = observeReward()
+            newAction = await sendState(currReward);
+            executeAction(newAction);
 
         } else if (aiRunning) {
 
@@ -178,6 +213,10 @@ async function gameLoop() {
         counter = 1n
     }
     counter += 1n
+
+    updateCar();
+    if (!isCarOnTrack()) initCar();
+    requestAnimationFrame(gameLoop);
 }
 
 
@@ -208,7 +247,7 @@ generateTrackButton.addEventListener('click', () => {
 });
 
 startAIButton.addEventListener('click', () => {
-    if (!training) {
+    if (!clientTraining) {
         aiRunning = !aiRunning;
         playerRunning = !aiRunning;
         startAIButton.textContent = (aiRunning) ? 'Stop AI (DQN)' : 'Start AI (DQN)';
@@ -219,17 +258,64 @@ startAIButton.addEventListener('click', () => {
 trainStopButton.addEventListener('click', () => {
     if (!aiRunning) {
         // UI Update
-        training = !training;
-        playerRunning = !training;
-        trainStopButton.textContent = (training) ? 'Stop' : 'Train';
+        clientTraining = !clientTraining;
+        playerRunning = !clientTraining;
+        trainStopButton.textContent = (clientTraining) ? 'Stop' : 'Train';
         initCar();
 
-        sendState();
+        
 
-        if (training) {
-            //Start SERVER Training
+        if (clientTraining) {
+
+            fetch('/api/startTraining', {
+                method: 'POST',
+                body: JSON.stringify({
+                    carPosX: car.x,
+                    carPosY: car.y,
+                    carSpeed: car.speed,
+                    carAngle: car.angle,
+                    track: trackPoints
+                }),
+                headers: new Headers({'Content-Type': 'application/json'})
+            })
+            .then((resp) => {
+                if (resp.ok) {
+                    resp.json().then((data) => {
+                        if (data === null || typeof data !== "object") console.error("Invalid response.");
+                        else if (data.action !== 'UpUp' && data.action !== 'UpDown' && data.action !== 'UpRight' && data.action !== 'UpLeft' && data.action !== 'DownUp' && data.action !== 'DownDown' && data.action !== 'DownRight' && data.action !== 'DownLeft' && data.action !== 'None') { 
+                            console.error("Invalid response.") 
+                        } else {
+
+                            executeAction(data.action);
+                            serverTraining=true;
+                        }
+
+                    })
+                } else {
+                    console.error('Status code' + resp.status + ': ' + resp.statusText)
+                }
+            })
+            .catch(() => console.error("Could not start training"))
+
+
         } else {
-            //Stop Server Training
+            fetch('/api/stopTraining', {
+                method: 'POST',
+                headers: new Headers({'Content-Type': 'application/json'})
+            })
+            .then((resp) => {
+                if (resp.ok) {
+                    resp.json().then((data) => {
+                        if (data === null || typeof data !== "object") console.error("Invalid response.");
+                        else {
+                            serverTraining=false;
+                        }
+                    })
+                } else {
+                    console.error('Status code' + resp.status + ': ' + resp.statusText)
+                }
+            })
+            .catch(() => console.error("Could not stop training"))
         }
     }
 })
