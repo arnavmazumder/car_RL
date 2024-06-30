@@ -52,8 +52,19 @@ class Agent:
     def selectAction(self, state, done):
         if done:
             state = self.initial_state
+        
+        val = random.random()
+        if val < self.epsilon:
+            action = random.choice(self.possible_actions)
+        else:
+            action = self.inferAction(state)
+        
+        self.epsilon = self.epsilon * self.eps_decay
+        if self.epsilon < self.min_eps: self.epsilon = self.min_eps
 
-        # TODO: Use state to select action w greedy epsilon
+        return action
+
+
 
 
     def step(self, curr_state, reward, done):
