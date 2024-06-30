@@ -1,10 +1,15 @@
 //Document constants
-
 const canvas = document.getElementById('gameCanvas');
 const generateTrackButton = document.getElementById('generate');
 const startAIButton = document.getElementById('start');
 const trainStopButton = document.getElementById('trainStop')
 const ctx = canvas.getContext('2d', {willReadFrequently: true});
+
+// Off-screen canvas for track drawing and collision detection
+const offscreenCanvas = document.createElement('canvas');
+offscreenCanvas.width = canvas.width;
+offscreenCanvas.height = canvas.height;
+const offscreenCtx = offscreenCanvas.getContext('2d');
 
 // UI state variables
 clientTraining = false;
@@ -22,7 +27,15 @@ let car = {
     rotateSpeed: 0.0,
     accel: 0.0,
     spawn_x: 0.0,
-    spawn_y: 0.0
+    spawn_y: 0.0,
+    N_trackDist: 0.0, 
+    NE_trackDist: 0.0,
+    NW_trackDist: 0.0,
+    S_trackDist: 0.0, 
+    SE_trackDist: 0.0,
+    SW_trackDist: 0.0, 
+    E_trackDist: 0.0,
+    W_trackDist: 0.0
 };
 
 
@@ -41,11 +54,18 @@ function generateTrackPoints(numPoints, radius, centerX, centerY) {
     car.angle=0.0;
     car.speed = 0.0;
     car.accel=0.0;
+    rotateSpeed= 0.0;
     car.spawn_x = car.x;
     car.spawn_y = car.y;
 
+    setTrackDists();
+
 
     return points;
+}
+
+function setTrackDists() {
+    // TODO: determine distance of car from track for 8 directions
 }
 
 // Generate random track
@@ -54,7 +74,9 @@ let trackPoints = generateTrackPoints(20, 300, canvas.width / 2, canvas.height /
 // Draw track
 const finishImage = new Image()
 finishImage.src = 'finish-line.png'
+
 function drawTrack(points) {
+    ctx.setLineDash([]);
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
     for (let i = 1; i < points.length; i++) {
@@ -63,6 +85,11 @@ function drawTrack(points) {
     ctx.closePath();
     ctx.strokeStyle = 'gray';
     ctx.lineWidth = 70;
+    ctx.stroke();
+
+    ctx.setLineDash([10, 10])
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 1;
     ctx.stroke();
 
     ctx.drawImage(finishImage, car.spawn_x-10, car.spawn_y-35, 20, 70)
@@ -81,19 +108,21 @@ function isCarOnTrack() {
           y: car.y - car.width / 2 * Math.sin(car.angle) - car.height / 2 * Math.cos(car.angle) }
     ];
 
-
-    ctx.beginPath();
-    ctx.moveTo(trackPoints[0].x, trackPoints[0].y);
+    offscreenCtx.clearRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+    offscreenCtx.beginPath();
+    offscreenCtx.moveTo(trackPoints[0].x, trackPoints[0].y);
     for (let i = 1; i < trackPoints.length; i++) {
-        ctx.lineTo(trackPoints[i].x, trackPoints[i].y);
+        offscreenCtx.lineTo(trackPoints[i].x, trackPoints[i].y);
     }
-    ctx.closePath();
+    offscreenCtx.closePath();
+    offscreenCtx.strokeStyle = 'gray';
+    offscreenCtx.lineWidth = 70;
+    offscreenCtx.stroke();
 
-
-    //ctx.fillStyle = 'blue';
+    // ctx.fillStyle = 'blue';
     for (let corner of carCorners) {
-        //ctx.fillRect(corner.x - 2.5, corner.y - 2.5, 5, 5);
-        if (!ctx.isPointInStroke(corner.x, corner.y)) {
+        // ctx.fillRect(corner.x - 2.5, corner.y - 2.5, 5, 5);
+        if (!offscreenCtx.isPointInStroke(corner.x, corner.y)) {
             return false;
         }
     }
@@ -109,8 +138,6 @@ function drawCar() {
     ctx.save();
     ctx.translate(car.x, car.y);
     ctx.rotate(car.angle);
-    // ctx.fillStyle = 'red';
-    // ctx.fillRect(-car.width / 2, -car.height / 2, car.width, car.height);
     ctx.drawImage(carImage, -car.width / 2, -car.height / 2, car.width, car.height)
     ctx.restore();
 }
@@ -132,6 +159,8 @@ function updateCar() {
 
     car.x += Math.cos(car.angle) * car.speed;
     car.y += Math.sin(car.angle) * car.speed;
+
+    setTrackDists();
 }
 
 function initCar() {
@@ -146,9 +175,28 @@ function initCar() {
 // Async/fetch functions
 
 // sends the game state to the server agent and return the next action
-async function sendState(reward) {
+async function sendState(reward, done, doneState) {
     try {
-        const args = {carPosX: car.x, carPosY: car.y, carSpeed: car.speed, carAngle: car.angle, track: trackPoints, reward: reward};
+        const args = (done) 
+            ? doneState 
+            : {
+                carPosX: car.x, 
+                carPosY: car.y,
+                carSpeed: car.speed, 
+                carAngle: car.angle,
+                N_trackDist: car.N_trackDist, 
+                NE_trackDist: car.NE_trackDist,
+                NW_trackDist: car.NW_trackDist,
+                S_trackDist: car.S_trackDist, 
+                SE_trackDist: car.SE_trackDist,
+                SW_trackDist: car.SW_trackDist, 
+                E_trackDist: car.E_trackDist,
+                W_trackDist: car.W_trackDist,
+                reward: reward,
+                done: done
+            };
+        
+
         const resp = await fetch('/api/sendState', {
                                 method: 'POST',
                                 body: JSON.stringify(args),
@@ -185,13 +233,15 @@ function executeAction(action) {
 } 
 
 function observeReward() {
-    const r = 1.1; //TODO
+    const r = 1.1; //TODO: positive for forwards, negative for backwards
     return r;
 
 }
 
 // Main game loop
 let counter = 1n;
+let done = false;
+let doneState = undefined;
 let newAction;
 let currReward;
 async function gameLoop() {
@@ -199,23 +249,44 @@ async function gameLoop() {
     drawTrack(trackPoints);
     drawCar();
     
-    if (counter%100n == 0n) {
-        //console.log("100 ticks")
+    if (counter%10n == 0n) {
+        //console.log("10 ticks")
         if (serverTraining) {
-            currReward = observeReward()
-            newAction = await sendState(currReward);
+            currReward = observeReward();
+            newAction = await sendState(currReward, done, doneState);
             executeAction(newAction);
+            done = false
 
         } else if (aiRunning) {
 
         }
 
-        counter = 1n
+        counter = 0n
     }
     counter += 1n
 
+    
+    if (!isCarOnTrack()) {
+        done = true
+        doneState = {
+            carPosX: car.x,
+            carPosY: car.y,
+            carSpeed: car.speed,
+            carAngle: car.angle,
+            N_trackDist: car.N_trackDist, 
+            NE_trackDist: car.NE_trackDist,
+            NW_trackDist: car.NW_trackDist,
+            S_trackDist: car.S_trackDist, 
+            SE_trackDist: car.SE_trackDist,
+            SW_trackDist: car.SW_trackDist, 
+            E_trackDist: car.E_trackDist,
+            W_trackDist: car.W_trackDist,
+            reward: -1,
+            done: done
+        }
+        initCar(); // TODO, if unable to train well add track generation every lap or so
+    }
     updateCar();
-    if (!isCarOnTrack()) initCar();
     requestAnimationFrame(gameLoop);
 }
 
@@ -274,7 +345,14 @@ trainStopButton.addEventListener('click', () => {
                     carPosY: car.y,
                     carSpeed: car.speed,
                     carAngle: car.angle,
-                    track: trackPoints
+                    N_trackDist: car.N_trackDist, 
+                    NE_trackDist: car.NE_trackDist,
+                    NW_trackDist: car.NW_trackDist,
+                    S_trackDist: car.S_trackDist, 
+                    SE_trackDist: car.SE_trackDist,
+                    SW_trackDist: car.SW_trackDist, 
+                    E_trackDist: car.E_trackDist,
+                    W_trackDist: car.W_trackDist
                 }),
                 headers: new Headers({'Content-Type': 'application/json'})
             })
@@ -299,6 +377,7 @@ trainStopButton.addEventListener('click', () => {
 
 
         } else {
+            
             fetch('/api/stopTraining', {
                 method: 'POST',
                 headers: new Headers({'Content-Type': 'application/json'})
