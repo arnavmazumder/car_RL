@@ -13,6 +13,7 @@ class Agent:
 
         # initialize neural networks
         self.possible_actions = ('DownUp', 'DownDown', 'DownLeft', 'DownRight', 'UpUp', 'UpDown', 'UpLeft', 'UpRight', 'None')
+        self.action_to_index = {action: idx for idx, action in enumerate(self.possible_actions)}
         self.state_params = ('carPosX', 'carPosY', 'carSpeed', 'carAngle', 'N_trackDist', 'NE_trackDist', 'NW_trackDist', 'S_trackDist', 'SE_trackDist', 'SW_trackDist', 'E_trackDist', 'W_trackDist')
         self.qNet = DNN(num_hidden_layers, hidden_layer_size, self.state_params, self.possible_actions)
         self.targetNet = DNN(num_hidden_layers, hidden_layer_size, self.state_params, self.possible_actions)
@@ -43,8 +44,7 @@ class Agent:
 
     
     def saveAsPrev(self, state, action, done):
-        if done: self.prevState = self.initial_state
-        else: self.prevState = state
+        self.prevState = self.initial_state if done else state
         self.prevAction = action
 
     
@@ -59,19 +59,34 @@ class Agent:
         else:
             action = self.inferAction(state)
         
-        self.epsilon = self.epsilon * self.eps_decay
-        if self.epsilon < self.min_eps: self.epsilon = self.min_eps
+        self.epsilon = max(self.epsilon * self.eps_decay, self.min_eps)
 
         return action
+    
+    
+
+    def inferAction(self, state):
+        state_tensor = self.preprocess(state).unsqueeze(0)  # Add batch dimension
+        q_values = self.qNet(state_tensor)
+        action_index = torch.argmax(q_values).item()
+        return self.possible_actions[action_index]
+
+
+
+    def preprocess(self, state):
+        state_vals = [state[key] for key in self.state_params]
+        return torch.tensor(state_vals, dtype=torch.float32).to(self.device)
 
 
 
 
-    def step(self, curr_state, reward, done):
+    def step(self, currState, reward, done):
 
-        # TODO: Preprocess
+        ppPrevState = self.preprocess(self.prevState)
+        ppCurrState = self.preprocess(currState)
+        action_index = self.action_to_index[self.prevAction]
 
-        self.replay_buffer.append((self.prevState, self.prevAction, reward, curr_state, done))
+        self.replay_buffer.append((ppPrevState, action_index, reward, ppCurrState, done))
         
         if len(self.replay_buffer) > self.batch_size:
             self.train()
@@ -90,11 +105,11 @@ class Agent:
 
         
         # Convert to PyTorch tensors
-        states = torch.tensor(states, dtype=torch.float32)
-        actions = torch.tensor(actions, dtype=torch.long)
-        rewards = torch.tensor(rewards, dtype=torch.float32)
-        next_states = torch.tensor(next_states, dtype=torch.float32)
-        dones = torch.tensor(dones, dtype=torch.float32)
+        states = torch.stack(states).to(self.device)
+        actions = torch.tensor(actions, dtype=torch.long).to(self.device)
+        rewards = torch.tensor(rewards, dtype=torch.float32).to(self.device)
+        next_states = torch.stack(next_states).to(self.device)
+        dones = torch.tensor(dones, dtype=torch.float32).to(self.device)
         
         # Compute current Q values
         q_values = self.qNet(states)
@@ -120,8 +135,6 @@ class Agent:
         
 
 
-    def inferAction(self, state):
-        pass
 
 
 class DNN(nn.Module):
