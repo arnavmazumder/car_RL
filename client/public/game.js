@@ -3,7 +3,9 @@ const canvas = document.getElementById('gameCanvas');
 const generateTrackButton = document.getElementById('generate');
 const startAIButton = document.getElementById('start');
 const trainStopButton = document.getElementById('trainStop')
+const dispSensorsButton = document.getElementById('dispSensors')
 const ctx = canvas.getContext('2d', {willReadFrequently: true});
+
 
 // Off-screen canvas for track drawing and collision detection
 const offscreenCanvas = document.createElement('canvas');
@@ -16,12 +18,14 @@ clientTraining = false;
 serverTraining = false;
 aiRunning = false;
 playerRunning = true;
+dispSensors = false;
 
 let car = {
     x: 100.0,
     y: 100.0,
     width: 25,
     height: 15,
+    corners: [],
     speed: 0.0,
     angle: 0.0,
     rotateSpeed: 0.0,
@@ -49,23 +53,34 @@ function generateTrackPoints(numPoints, radius, centerX, centerY) {
         let y = centerY + 0.8*radius * Math.sin(angle) + (Math.random() - 0.5) * 100;
         points.push({ x, y });
     }
-    car.x = points[4].x;
-    car.y = points[4].y;
-    car.angle=0.0;
-    car.speed = 0.0;
-    car.accel=0.0;
-    rotateSpeed= 0.0;
-    car.spawn_x = car.x;
-    car.spawn_y = car.y;
 
-    setTrackDists();
+    car.spawn_x = points[4].x;
+    car.spawn_y = points[4].y;
 
+    initCar();
 
     return points;
 }
 
-function setTrackDists() {
+function setTrackDists(disp) {
     // TODO: determine distance of car from track for 8 directions
+    const init_x = (car.corners[0].x + car.corners[2].x)/2 - 1;
+    const init_y = (car.corners[0].y + car.corners[2].y)/2 - 1;
+
+    let x = init_x;
+    let y = init_y;
+    let imgData = [1, 1, 1, 1]
+
+
+    while (!(imgData[0]===0 && imgData[1]===0 && imgData[2]===0 && imgData[3]===0)) {
+        if (disp) ctx.fillRect(x, y, 2, 2);
+        x += 10 * Math.cos(car.angle)
+        y += 10 * Math.sin(car.angle)
+        imgData = ctx.getImageData(x, y, 1, 1).data;
+    }
+
+    car.N_trackDist = Math.sqrt((x - 10 * Math.cos(car.angle) - init_x + 1)**2 + (y - 10 * Math.sin(car.angle) - init_y + 1)**2);
+
 }
 
 // Generate random track
@@ -142,7 +157,7 @@ function drawCar() {
     ctx.restore();
 }
 
-function updateCar() {
+function updateCar(disp) {
     car.angle += car.rotateSpeed;
 
     if (car.accel!==0) {
@@ -160,16 +175,54 @@ function updateCar() {
     car.x += Math.cos(car.angle) * car.speed;
     car.y += Math.sin(car.angle) * car.speed;
 
-    setTrackDists();
+    car.corners = [
+        { x: car.x + car.width / 2 * Math.cos(car.angle) - car.height / 2 * Math.sin(car.angle),
+          y: car.y + car.width / 2 * Math.sin(car.angle) + car.height / 2 * Math.cos(car.angle) },
+        { x: car.x - car.width / 2 * Math.cos(car.angle) - car.height / 2 * Math.sin(car.angle),
+          y: car.y - car.width / 2 * Math.sin(car.angle) + car.height / 2 * Math.cos(car.angle) },
+        { x: car.x + car.width / 2 * Math.cos(car.angle) + car.height / 2 * Math.sin(car.angle),
+          y: car.y + car.width / 2 * Math.sin(car.angle) - car.height / 2 * Math.cos(car.angle) },
+        { x: car.x - car.width / 2 * Math.cos(car.angle) + car.height / 2 * Math.sin(car.angle),
+          y: car.y - car.width / 2 * Math.sin(car.angle) - car.height / 2 * Math.cos(car.angle) }
+    ];
+
+    setTrackDists(disp);
 }
 
-function initCar() {
+function initCar(disp) {
     car.x = car.spawn_x;
     car.y = car.spawn_y;
     car.speed = 0.0;
     car.accel = 0.0;
     car.angle=0.0;
     car.rotateSpeed=0.0;
+
+    car.corners = [
+        { x: car.x + car.width / 2 * Math.cos(car.angle) - car.height / 2 * Math.sin(car.angle),
+          y: car.y + car.width / 2 * Math.sin(car.angle) + car.height / 2 * Math.cos(car.angle) },
+        { x: car.x - car.width / 2 * Math.cos(car.angle) - car.height / 2 * Math.sin(car.angle),
+          y: car.y - car.width / 2 * Math.sin(car.angle) + car.height / 2 * Math.cos(car.angle) },
+        { x: car.x + car.width / 2 * Math.cos(car.angle) + car.height / 2 * Math.sin(car.angle),
+          y: car.y + car.width / 2 * Math.sin(car.angle) - car.height / 2 * Math.cos(car.angle) },
+        { x: car.x - car.width / 2 * Math.cos(car.angle) + car.height / 2 * Math.sin(car.angle),
+          y: car.y - car.width / 2 * Math.sin(car.angle) - car.height / 2 * Math.cos(car.angle) }
+    ];
+
+    setTrackDists(disp)
+}
+
+function drawBumpers() {
+
+    ctx.fillStyle = 'blue';
+    for (let corner of car.corners) {
+        ctx.fillRect(corner.x - 2.5, corner.y - 2.5, 5, 5);
+    }
+
+    ctx.fillRect((car.corners[0].x +  car.corners[1].x)/2 -2.5, (car.corners[0].y + car.corners[1].y)/2 -2.5, 5, 5);
+    ctx.fillRect((car.corners[2].x +  car.corners[3].x)/2 -2.5, (car.corners[2].y + car.corners[3].y)/2 -2.5, 5, 5);
+    ctx.fillRect((car.corners[0].x +  car.corners[2].x)/2 -2.5, (car.corners[0].y + car.corners[2].y)/2 -2.5, 5, 5);
+    ctx.fillRect((car.corners[1].x +  car.corners[3].x)/2 -2.5, (car.corners[1].y + car.corners[3].y)/2 -2.5, 5, 5);
+
 }
 
 // Async/fetch functions
@@ -248,6 +301,8 @@ async function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawTrack(trackPoints);
     drawCar();
+
+    if (dispSensors) { drawBumpers(); }
     
     if (counter%10n == 0n) {
         //console.log("10 ticks")
@@ -258,7 +313,7 @@ async function gameLoop() {
             done = false
 
         } else if (aiRunning) {
-
+            // TODO: get an action and execute
         }
 
         counter = 0n
@@ -284,9 +339,9 @@ async function gameLoop() {
             reward: -1,
             done: done
         }
-        initCar(); // TODO, if unable to train well add track generation every lap or so
+        initCar(dispSensors); // TODO, if unable to train well add track generation every lap or so
     }
-    updateCar();
+    updateCar(dispSensors);
     requestAnimationFrame(gameLoop);
 }
 
@@ -310,6 +365,11 @@ document.addEventListener('keyup', (event) => {
         if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') car.rotateSpeed = 0;
     }
 });
+
+dispSensorsButton.addEventListener('click', () => {
+    dispSensors = !dispSensors
+    dispSensorsButton.textContent = (dispSensors) ? 'Remove Sensors' : 'Display Sensors';
+})
 
 generateTrackButton.addEventListener('click', () => {
     if (playerRunning) {
