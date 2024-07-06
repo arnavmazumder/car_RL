@@ -14,11 +14,12 @@ offscreenCanvas.height = canvas.height;
 const offscreenCtx = offscreenCanvas.getContext('2d');
 
 // UI state variables
-clientTraining = false;
-serverTraining = false;
-aiRunning = false;
-playerRunning = true;
-dispSensors = false;
+let clientTraining = false;
+let serverTraining = false;
+let clientAiRunning = false;
+let serverAiRunning = false;
+let playerRunning = true;
+let dispSensors = false;
 
 let car = {
     x: 100.0,
@@ -33,13 +34,9 @@ let car = {
     spawn_x: 0.0,
     spawn_y: 0.0,
     N_trackDist: 0.0, 
-    NE_trackDist: 0.0,
-    NW_trackDist: 0.0,
     S_trackDist: 0.0, 
-    SE_trackDist: 0.0,
-    SW_trackDist: 0.0, 
     E_trackDist: 0.0,
-    W_trackDist: 0.0
+    W_trackDist: 0.0,
 };
 
 
@@ -63,14 +60,14 @@ function generateTrackPoints(numPoints, radius, centerX, centerY) {
 }
 
 function setTrackDists(disp) {
-    // TODO: determine distance of car from track for 8 directions
-    const init_x = (car.corners[0].x + car.corners[2].x)/2 - 1;
-    const init_y = (car.corners[0].y + car.corners[2].y)/2 - 1;
+
+    // Car's North vision
+    let init_x = (car.corners[0].x + car.corners[2].x)/2 - 1;
+    let init_y = (car.corners[0].y + car.corners[2].y)/2 - 1;
 
     let x = init_x;
     let y = init_y;
     let imgData = [1, 1, 1, 1]
-
 
     while (!(imgData[0]===0 && imgData[1]===0 && imgData[2]===0 && imgData[3]===0)) {
         if (disp) ctx.fillRect(x, y, 2, 2);
@@ -79,7 +76,64 @@ function setTrackDists(disp) {
         imgData = ctx.getImageData(x, y, 1, 1).data;
     }
 
-    car.N_trackDist = Math.sqrt((x - 10 * Math.cos(car.angle) - init_x + 1)**2 + (y - 10 * Math.sin(car.angle) - init_y + 1)**2);
+    car.N_trackDist = Math.sqrt((x - 10 * Math.cos(car.angle) - init_x - 1)**2 + (y - 10 * Math.sin(car.angle) - init_y - 1)**2);
+
+
+    //Car's South vision
+    init_x = (car.corners[1].x + car.corners[3].x)/2 - 1;
+    init_y = (car.corners[1].y + car.corners[3].y)/2 - 1;
+
+    x = init_x;
+    y = init_y;
+    imgData = [1, 1, 1, 1]
+
+    while (!(imgData[0]===0 && imgData[1]===0 && imgData[2]===0 && imgData[3]===0)) {
+        if (disp) ctx.fillRect(x, y, 2, 2);
+        x -= 10 * Math.cos(car.angle)
+        y -= 10 * Math.sin(car.angle)
+        imgData = ctx.getImageData(x, y, 1, 1).data;
+    }
+
+    car.S_trackDist = Math.sqrt((x + 10 * Math.cos(car.angle) - init_x - 1)**2 + (y + 10 * Math.sin(car.angle) - init_y - 1)**2);
+
+
+
+    //Car's East vision
+    init_x = (car.corners[1].x + car.corners[0].x)/2 - 1;
+    init_y = (car.corners[1].y + car.corners[0].y)/2 - 1;
+
+    x = init_x;
+    y = init_y;
+    imgData = [1, 1, 1, 1]
+
+    while (!(imgData[0]===0 && imgData[1]===0 && imgData[2]===0 && imgData[3]===0)) {
+        if (disp) ctx.fillRect(x, y, 2, 2);
+        x -= 10 * Math.sin(car.angle)
+        y += 10 * Math.cos(car.angle)
+        imgData = ctx.getImageData(x, y, 1, 1).data;
+    }
+
+    car.E_trackDist = Math.sqrt((x + 10 * Math.sin(car.angle) - init_x - 1)**2 + (y - 10 * Math.cos(car.angle) - init_y - 1)**2);
+
+
+
+    //Car's West vision
+    init_x = (car.corners[2].x + car.corners[3].x)/2 - 1;
+    init_y = (car.corners[2].y + car.corners[3].y)/2 - 1;
+
+    x = init_x;
+    y = init_y;
+    imgData = [1, 1, 1, 1]
+
+    while (!(imgData[0]===0 && imgData[1]===0 && imgData[2]===0 && imgData[3]===0)) {
+        if (disp) ctx.fillRect(x, y, 2, 2);
+        x += 10 * Math.sin(car.angle)
+        y -= 10 * Math.cos(car.angle)
+        imgData = ctx.getImageData(x, y, 1, 1).data;
+    }
+
+    car.W_trackDist = Math.sqrt((x - 10 * Math.sin(car.angle) - init_x - 1)**2 + (y + 10 * Math.cos(car.angle) - init_y - 1)**2);
+
 
 }
 
@@ -112,16 +166,6 @@ function drawTrack(points) {
 }
 
 function isCarOnTrack() {
-    const carCorners = [
-        { x: car.x + car.width / 2 * Math.cos(car.angle) - car.height / 2 * Math.sin(car.angle),
-          y: car.y + car.width / 2 * Math.sin(car.angle) + car.height / 2 * Math.cos(car.angle) },
-        { x: car.x - car.width / 2 * Math.cos(car.angle) - car.height / 2 * Math.sin(car.angle),
-          y: car.y - car.width / 2 * Math.sin(car.angle) + car.height / 2 * Math.cos(car.angle) },
-        { x: car.x + car.width / 2 * Math.cos(car.angle) + car.height / 2 * Math.sin(car.angle),
-          y: car.y + car.width / 2 * Math.sin(car.angle) - car.height / 2 * Math.cos(car.angle) },
-        { x: car.x - car.width / 2 * Math.cos(car.angle) + car.height / 2 * Math.sin(car.angle),
-          y: car.y - car.width / 2 * Math.sin(car.angle) - car.height / 2 * Math.cos(car.angle) }
-    ];
 
     offscreenCtx.clearRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
     offscreenCtx.beginPath();
@@ -135,7 +179,7 @@ function isCarOnTrack() {
     offscreenCtx.stroke();
 
     // ctx.fillStyle = 'blue';
-    for (let corner of carCorners) {
+    for (let [i, corner] of car.corners.entries()) {
         // ctx.fillRect(corner.x - 2.5, corner.y - 2.5, 5, 5);
         if (!offscreenCtx.isPointInStroke(corner.x, corner.y)) {
             return false;
@@ -157,7 +201,7 @@ function drawCar() {
     ctx.restore();
 }
 
-function updateCar(disp) {
+function updateCar() {
     car.angle += car.rotateSpeed;
 
     if (car.accel!==0) {
@@ -186,11 +230,10 @@ function updateCar(disp) {
           y: car.y - car.width / 2 * Math.sin(car.angle) - car.height / 2 * Math.cos(car.angle) }
     ];
 
-    setTrackDists(disp);
 }
 
-function initCar(disp) {
-    car.x = car.spawn_x;
+function initCar() {
+    car.x = car.spawn_x - 25;
     car.y = car.spawn_y;
     car.speed = 0.0;
     car.accel = 0.0;
@@ -208,7 +251,6 @@ function initCar(disp) {
           y: car.y - car.width / 2 * Math.sin(car.angle) - car.height / 2 * Math.cos(car.angle) }
     ];
 
-    setTrackDists(disp)
 }
 
 function drawBumpers() {
@@ -236,18 +278,18 @@ async function sendState(reward, done, doneState) {
                 carPosX: car.x, 
                 carPosY: car.y,
                 carSpeed: car.speed, 
-                carAngle: car.angle,
+                sineAngle: Math.sin(car.angle),
+                cosineAngle: Math.cos(car.angle),
                 N_trackDist: car.N_trackDist, 
-                NE_trackDist: car.NE_trackDist,
-                NW_trackDist: car.NW_trackDist,
                 S_trackDist: car.S_trackDist, 
-                SE_trackDist: car.SE_trackDist,
-                SW_trackDist: car.SW_trackDist, 
                 E_trackDist: car.E_trackDist,
                 W_trackDist: car.W_trackDist,
                 reward: reward,
-                done: done
+                done: done,
+                isTrain: serverTraining
             };
+        
+            console.log(args.reward)
         
 
         const resp = await fetch('/api/sendState', {
@@ -263,6 +305,7 @@ async function sendState(reward, done, doneState) {
         
         //actions are in the form of KeyDirection
         if (data.action !== 'UpUp' && data.action !== 'UpDown' && data.action !== 'UpRight' && data.action !== 'UpLeft' && data.action !== 'DownUp' && data.action !== 'DownDown' && data.action !== 'DownRight' && data.action !== 'DownLeft' && data.action !== 'None') { 
+            console.log(data)
             throw Error("Invalid response: " + data.action) 
         }
 
@@ -277,19 +320,74 @@ async function sendState(reward, done, doneState) {
 // Training Simulation Functions
 
 function executeAction(action) {
-    if (action === 'DownUp') car.accel = 0.25;
-    if (action === 'DownDown') car.accel = -0.25;
-    if (action === 'DownLeft') car.rotateSpeed = -0.06;
-    if (action === 'DownRight') car.rotateSpeed = 0.06;
+
+    if (action === 'DownUp') car.accel = 0.1;
+    if (action === 'DownDown') car.accel = -0.1;
+    if (action === 'DownLeft') car.rotateSpeed = -0.04;
+    if (action === 'DownRight') car.rotateSpeed = 0.04;
     if (action === 'UpUp' || action === 'UpDown') car.accel=0;
     if (action === 'UpLeft' || action === 'UpRight') car.rotateSpeed = 0;
 } 
 
-function observeReward() {
-    const r = 1.1; //TODO: positive for forwards, negative for backwards
-    return r;
 
+function drawGates(disp) {
+    front = {x: (car.corners[0].x + car.corners[2].x)/2, y: (car.corners[0].y + car.corners[2].y)/2}
+    back = {x: (car.corners[1].x + car.corners[1].x)/2, y: (car.corners[3].y + car.corners[3].y)/2}
+    const gateWidth = 70; // Same as track width
+    ctx.strokeStyle = 'blue';
+    ctx.lineWidth = 2;
+    offscreenCtx.lineWidth = 15;
+    let reward = 0.1;
+    for (let i = 0; i < trackPoints.length; i++) {
+        const currentPoint = trackPoints[i];
+        const nextPoint = trackPoints[(i + 1) % trackPoints.length];
+        const prevPoint = trackPoints[(i - 1 + trackPoints.length) % trackPoints.length];
+        
+        // Calculate direction vector
+        let dx = nextPoint.x - prevPoint.x;
+        let dy = nextPoint.y - prevPoint.y;
+        
+        // Normalize direction vector
+        const length = Math.sqrt(dx * dx + dy * dy);
+        dx /= length;
+        dy /= length;
+        
+        // Perpendicular vector
+        const perpX = -dy;
+        const perpY = dx;
+        
+        // Calculate gate endpoints
+        const gateStartX = currentPoint.x - perpX * gateWidth / 2;
+        const gateStartY = currentPoint.y - perpY * gateWidth / 2;
+        const gateEndX = currentPoint.x + perpX * gateWidth / 2;
+        const gateEndY = currentPoint.y + perpY * gateWidth / 2;
+        
+        // Draw gate
+        if (disp) {
+            ctx.beginPath();
+            ctx.moveTo(gateStartX, gateStartY);
+            ctx.lineTo(gateEndX, gateEndY);
+            ctx.stroke();
+        }
+
+        offscreenCtx.beginPath();
+        offscreenCtx.moveTo(gateStartX, gateStartY);
+        offscreenCtx.lineTo(gateEndX, gateEndY);
+        offscreenCtx.stroke();
+
+        if (offscreenCtx.isPointInStroke(front.x, front.y)) {
+            if (car.speed < 0) {
+                reward = -1;
+            } else if (car.speed > 0) {
+                reward = 0.5;
+            }
+        }
+
+    }
+
+    return reward;
 }
+
 
 // Main game loop
 let counter = 1n;
@@ -297,51 +395,65 @@ let done = false;
 let doneState = undefined;
 let newAction;
 let currReward;
+let backState;
 async function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawTrack(trackPoints);
     drawCar();
 
+    setTrackDists(dispSensors);
     if (dispSensors) { drawBumpers(); }
-    
-    if (counter%10n == 0n) {
-        //console.log("10 ticks")
-        if (serverTraining) {
-            currReward = observeReward();
-            newAction = await sendState(currReward, done, doneState);
-            executeAction(newAction);
-            done = false
+    currReward = drawGates(dispSensors)
 
-        } else if (aiRunning) {
-            // TODO: get an action and execute
-        }
-
-        counter = 0n
-    }
-    counter += 1n
-
-    
     if (!isCarOnTrack()) {
-        done = true
+        done = true;
         doneState = {
             carPosX: car.x,
             carPosY: car.y,
             carSpeed: car.speed,
-            carAngle: car.angle,
+            sineAngle: Math.sin(car.angle),
+            cosineAngle: Math.cos(car.angle),
             N_trackDist: car.N_trackDist, 
-            NE_trackDist: car.NE_trackDist,
-            NW_trackDist: car.NW_trackDist,
             S_trackDist: car.S_trackDist, 
-            SE_trackDist: car.SE_trackDist,
-            SW_trackDist: car.SW_trackDist, 
             E_trackDist: car.E_trackDist,
             W_trackDist: car.W_trackDist,
             reward: -1,
-            done: done
+            done: done,
+            isTrain: serverTraining
         }
-        initCar(dispSensors); // TODO, if unable to train well add track generation every lap or so
+
+        car.x = backState.x;
+        car.y = backState.y;
+        car.angle = backState.angle;
+        car.N_trackDist = backState.N_trackDist;
+        car.S_trackDist = backState.S_trackDist
+        car.E_trackDist = backState.E_trackDist
+        car.W_trackDist = backState.W_trackDist;
+        car.speed = -car.speed/2;
+        
+    } else {
+        backState = {
+            x: car.x,
+            y: car.y,
+            angle: car.angle,
+            N_trackDist: car.N_trackDist, 
+            S_trackDist: car.S_trackDist, 
+            E_trackDist: car.E_trackDist,
+            W_trackDist: car.W_trackDist,
+        }
     }
-    updateCar(dispSensors);
+
+
+    if (serverTraining || serverAiRunning) { 
+        newAction = await sendState(currReward, done, doneState);
+        console.log(newAction)
+        executeAction(newAction);
+
+        done = false
+
+    }
+    
+    updateCar();
     requestAnimationFrame(gameLoop);
 }
 
@@ -352,10 +464,10 @@ async function gameLoop() {
 
 document.addEventListener('keydown', (event) => {
     if (playerRunning) {
-        if (event.key === 'ArrowUp') car.accel = 0.25;
-        if (event.key === 'ArrowDown') car.accel = -0.25;
-        if (event.key === 'ArrowLeft') car.rotateSpeed = -0.06; 
-        if (event.key === 'ArrowRight') car.rotateSpeed = 0.06;
+        if (event.key === 'ArrowUp') car.accel = 0.1;
+        if (event.key === 'ArrowDown') car.accel = -0.1;
+        if (event.key === 'ArrowLeft') car.rotateSpeed = -0.035; 
+        if (event.key === 'ArrowRight') car.rotateSpeed = 0.035;
     }
 });
 
@@ -379,15 +491,65 @@ generateTrackButton.addEventListener('click', () => {
 
 startAIButton.addEventListener('click', () => {
     if (!clientTraining) {
-        aiRunning = !aiRunning;
-        playerRunning = !aiRunning;
-        startAIButton.textContent = (aiRunning) ? 'Stop AI (DQN)' : 'Start AI (DQN)';
+        clientAiRunning = !clientAiRunning;
+        playerRunning = !clientAiRunning;
+        startAIButton.textContent = (clientAiRunning) ? 'Stop AI (DQN)' : 'Start AI (DQN)';
         initCar();
+
+        if (clientAiRunning) {
+            fetch('api/startAI', {method: 'POST',
+                body: JSON.stringify({
+                    carPosX: car.x,
+                    carPosY: car.y,
+                    carSpeed: car.speed,
+                    sineAngle: Math.sin(car.angle),
+                    cosineAngle: Math.cos(car.angle),
+                    N_trackDist: car.N_trackDist, 
+                    S_trackDist: car.S_trackDist, 
+                    E_trackDist: car.E_trackDist,
+                    W_trackDist: car.W_trackDist
+                }), 
+                headers: new Headers({'Content-Type': 'application/json'})})
+            .then((resp) => {
+                if (resp.ok) {
+                    resp.json().then((data) => {
+                        if (data === null || typeof data !== "object") console.error("Invalid response.");
+                        else if (data.action !== 'UpUp' && data.action !== 'UpDown' && data.action !== 'UpRight' && data.action !== 'UpLeft' && data.action !== 'DownUp' && data.action !== 'DownDown' && data.action !== 'DownRight' && data.action !== 'DownLeft' && data.action !== 'None') { 
+                            console.error("Invalid response.") 
+                        } else {
+
+                            executeAction(data.action);
+                            serverAiRunning=true;
+                        }
+
+                    })
+                } else {
+                    console.error('Status code' + resp.status + ': ' + resp.statusText)
+                }
+            })
+            .catch(() => console.error("Could not start AI"))
+        } else {
+            serverAiRunning = false;
+
+            fetch('/api/stopAI', {method:'POST', headers: new Headers({'Content-Type': 'application/json'})})
+            .then((resp) => {
+                if (resp.ok) {
+                    resp.json().then((data) => {
+                        if (data === null || typeof data !== "object") console.error("Invalid response.");
+                    })
+                } else {
+                    console.error('Status code' + resp.status + ': ' + resp.statusText)
+                }
+            })
+            .catch(() => console.error("Could not stop AI"))
+        }
     }
 });
 
+
+
 trainStopButton.addEventListener('click', () => {
-    if (!aiRunning) {
+    if (!clientAiRunning) {
         // UI Update
         clientTraining = !clientTraining;
         playerRunning = !clientTraining;
@@ -404,13 +566,10 @@ trainStopButton.addEventListener('click', () => {
                     carPosX: car.x,
                     carPosY: car.y,
                     carSpeed: car.speed,
-                    carAngle: car.angle,
+                    sineAngle: Math.sin(car.angle),
+                    cosineAngle: Math.cos(car.angle),
                     N_trackDist: car.N_trackDist, 
-                    NE_trackDist: car.NE_trackDist,
-                    NW_trackDist: car.NW_trackDist,
                     S_trackDist: car.S_trackDist, 
-                    SE_trackDist: car.SE_trackDist,
-                    SW_trackDist: car.SW_trackDist, 
                     E_trackDist: car.E_trackDist,
                     W_trackDist: car.W_trackDist
                 }),
@@ -437,6 +596,8 @@ trainStopButton.addEventListener('click', () => {
 
 
         } else {
+
+            serverTraining=false;
             
             fetch('/api/stopTraining', {
                 method: 'POST',
@@ -446,9 +607,6 @@ trainStopButton.addEventListener('click', () => {
                 if (resp.ok) {
                     resp.json().then((data) => {
                         if (data === null || typeof data !== "object") console.error("Invalid response.");
-                        else {
-                            serverTraining=false;
-                        }
                     })
                 } else {
                     console.error('Status code' + resp.status + ': ' + resp.statusText)
