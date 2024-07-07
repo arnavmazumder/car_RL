@@ -13,9 +13,9 @@ class Agent:
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else 'cpu')
 
         # initialize neural networks
-        self.possible_actions = ('DownUp', 'DownDown', 'DownLeft', 'DownRight', 'UpUp', 'UpDown', 'UpLeft', 'UpRight', 'None')
+        self.possible_actions = ('UpSwitch', 'LeftSwitch', 'RightSwitch', 'None')
         self.action_to_index = {action: idx for idx, action in enumerate(self.possible_actions)}
-        self.state_params = ('carPosX', 'carPosY', 'carSpeed', 'sineAngle', 'cosineAngle', 'N_trackDist', 'S_trackDist', 'E_trackDist', 'W_trackDist')
+        self.state_params = ('carX', 'carY', 'sineAngle', 'cosAngle', 'carSpeed', 'NE_trackDist', 'NW_trackDist', 'N_trackDist', 'S_trackDist', 'E_trackDist', 'W_trackDist', 'up', 'left', 'right')
         self.qNet = DNN(num_hidden_layers, hidden_layer_size, self.state_params, self.possible_actions)
         self.targetNet = DNN(num_hidden_layers, hidden_layer_size, self.state_params, self.possible_actions)
         self.targetNet.load_state_dict(self.qNet.state_dict())
@@ -35,13 +35,20 @@ class Agent:
         self.prevAction = None
 
         # Agent memory and initial state
-        self.replay_buffer = deque(maxlen=1000000)
+        self.replay_buffer = deque(maxlen=2000000)
         self.initial_state = initial_state
 
         # time-step and episode
         self.t = 1
         self.episode = 1
+
+        # metrics
         self.losses = []
+        self.cum_reward = [0]
+
+        # heuristic mins and maxes
+        self.min_vals = torch.tensor([20, 20, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], dtype=torch.float32)
+        self.max_vals = torch.tensor([1400, 640, 1, 1, 10, 800, 800, 800, 800, 800, 800, 1, 1, 1], dtype=torch.float32)
 
 
     
@@ -76,13 +83,11 @@ class Agent:
 
 
     def preprocess(self, state):
+        for val in ('up', 'right', 'left'): state[val] = int(state[val])
         state_vals = [state[key] for key in self.state_params]
         state_tensor = torch.tensor(state_vals, dtype=torch.float32).to(self.device)
 
-        # heuristic mins and maxes
-        min_vals = torch.tensor([20, 20, -20, -1, -1, 0, 0, 0, 0], dtype=torch.float32)
-        max_vals = torch.tensor([1400, 640, 20, 1, 1, 1000, 1000, 1000, 1000], dtype=torch.float32)
-        state_tensor = (state_tensor - min_vals) / (max_vals - min_vals)
+        state_tensor = (state_tensor - self.min_vals) / (self.max_vals - self.min_vals)
 
         return state_tensor.to(self.device)
 
@@ -105,12 +110,14 @@ class Agent:
         else: 
             self.t += 1
         
+        self.cum_reward.append(self.cum_reward[-1] + reward)
+        
+
 
     
     def train(self):
         batch = random.sample(self.replay_buffer, self.batch_size)
         states, actions, rewards, next_states, dones = zip(*batch)
-
         
         # Convert to PyTorch tensors
         states = torch.stack(states).to(self.device)
@@ -127,18 +134,18 @@ class Agent:
         next_q_values = self.targetNet(next_states).max(1)[0]
         
         # Compute target Q values
-        target_q_values = rewards + self.gamma * next_q_values #* (1 - dones)
+        target_q_values = rewards + self.gamma * next_q_values * (1 - dones)
         
         # Compute loss
         loss = F.mse_loss(q_values, target_q_values)
-        print(f'Episode: {self.episode}, Time: {self.t}, Loss: {loss.item()}, Epsilon: {self.epsilon}, Memory: {len(self.replay_buffer)}/1000000')
+        print(f'Episode: {self.episode}, Time: {self.t}, Loss: {loss.item()}, Epsilon: {self.epsilon}, Memory: {len(self.replay_buffer)}/2000000')
         self.losses.append(loss.item())
+
         
         # Optimize the model
         self.optimizer.zero_grad()
         loss.backward()
-        for param in self.qNet.parameters():
-            param.grad.data.clamp_(-1, 1)
+        torch.nn.utils.clip_grad_norm_(self.qNet.parameters(), 1)
         self.optimizer.step()
 
         # Refresh target network
