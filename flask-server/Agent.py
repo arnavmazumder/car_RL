@@ -8,7 +8,7 @@ import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 
 class Agent:
-    def __init__(self, num_hidden_layers, hidden_layer_size, epsilon, eps_decay, min_eps, gamma, targetRefreshRate, batch_size, learning_rate, initial_state):
+    def __init__(self, num_hidden_layers, hidden_layer_size, epsilon, eps_decay, min_eps, gamma, targetRefreshRate, batch_size, learning_rate, initial_state, buffer_cap):
 
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else 'cpu')
 
@@ -35,16 +35,17 @@ class Agent:
         self.prevAction = None
 
         # Agent memory and initial state
-        self.replay_buffer = deque(maxlen=2000000)
+        self.replay_buffer = deque(maxlen=buffer_cap)
         self.initial_state = initial_state
 
         # time-step and episode
         self.t = 1
         self.episode = 1
+        self.curr_reward = 0
 
         # metrics
         self.losses = []
-        self.cum_reward = [0]
+        self.rewards = []
 
         # heuristic mins and maxes
         self.min_vals = torch.tensor([20, 20, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], dtype=torch.float32)
@@ -52,16 +53,14 @@ class Agent:
 
 
     
-    def saveAsPrev(self, state, action, done):
-        self.prevState = state # self.initial_state if done else state
+    def saveAsPrev(self, state, action):
+        self.prevState = state
         self.prevAction = action
 
     
 
-    def selectAction(self, state, done):
-        # if done:
-        #     state = self.initial_state
-        
+    def selectAction(self, state):
+
         val = random.random()
         if val < self.epsilon:
             action = random.choice(self.possible_actions)
@@ -104,13 +103,15 @@ class Agent:
         if len(self.replay_buffer) > self.batch_size:
             self.train()
         
+        self.curr_reward += (self.gamma ** self.t) * reward
+        
         if done:
             self.t = 1
             self.episode += 1
+            self.rewards.append(self.curr_reward)
+            self.curr_reward = 0
         else: 
             self.t += 1
-        
-        self.cum_reward.append(self.cum_reward[-1] + reward)
         
 
 
@@ -138,7 +139,7 @@ class Agent:
         
         # Compute loss
         loss = F.mse_loss(q_values, target_q_values)
-        print(f'Episode: {self.episode}, Time: {self.t}, Loss: {loss.item()}, Epsilon: {self.epsilon}, Memory: {len(self.replay_buffer)}/2000000')
+        print(f'Episode: {self.episode}, Time: {self.t}, Loss: {loss.item()}, Epsilon: {self.epsilon}, Memory: {len(self.replay_buffer)}/100000000')
         self.losses.append(loss.item())
 
         
