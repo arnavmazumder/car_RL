@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import requests
 import time
 
-rewards = []
-losses = []
+rewards = [0]
+losses = [0]
 running = True
 
 def fetch_data():
@@ -35,9 +35,11 @@ def plotMetrics():
 
     ax1.set_xlabel('Frames')
     ax1.set_ylabel('Loss')
+    ax1.set_title('Loss')
     
     ax2.set_xlabel('Episodes')
     ax2.set_ylabel('Reward')
+    ax2.set_title('Reward')
 
     plt.subplots_adjust(hspace=0.5)
 

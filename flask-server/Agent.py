@@ -137,7 +137,7 @@ class Agent:
         
         # Compute loss
         loss = F.mse_loss(q_values, target_q_values)
-        print(f'Episode: {self.episode}, Time: {self.t}, Loss: {loss.item()}, Epsilon: {self.epsilon}, Memory: {len(self.replay_buffer)}/100000000')
+        print(f'Episode: {self.episode}, Time: {self.t}, Loss: {loss.item()}, Epsilon: {self.epsilon}, Memory: {len(self.replay_buffer) if self.replay_buffer else 'Stopped'}/100000000')
         self.losses.append(loss.item())
 
         
