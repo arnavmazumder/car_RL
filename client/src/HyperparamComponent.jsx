@@ -103,23 +103,8 @@ const HyperparamComponent = () => {
         setSeed('');
     }
 
-    const toNumbers = () => {
-        setHiddenLayers(Number(hiddenLayers));
-        setHiddenLayerNodes(Number(hiddenLayerNodes));
-        setEpsilon(Number(epsilon));
-        setEpsDecay(Number(epsDecay));
-        setMinEps(Number(minEps));
-        setGamma(Number(gamma));
-        setC(Number(C));
-        setbatchSize(Number(batchSize));
-        setLr(Number(lr));
-        setBuffer(Number(buffer));
-        setSeed(Number(seed));
-    }
-
     const onSelectHyperparamClick = () => {
         if (!window.playerRunning) return;
-        toNumbers();
 
         if (hiddenLayers==='' || !Number.isInteger(Number(hiddenLayers)) || Number(hiddenLayers)<1 || Number(hiddenLayers)>1000000) {
             setErr({'msg': 'Invalid Hidden Layers field.', isPos:false});
