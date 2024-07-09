@@ -2,7 +2,7 @@
 
 This web application is designed to perform training experiments on a self-driving agent in a track environment. Through this interface, users can select training hyperparameters, run training experiments, view live metrics, save and run trained models, generate random tracks, display collision and rewards sensors, and control respawning behavior. 
 
-![hippo]()
+![hippo](https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdW0zbTVhNDl4MW5teTI1eG5zeTlvNmU0NDY0Z2I1djMyeHVndms4YiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/knutq4zI3tiR5ZOmjV/giphy.gif)
 
 
 ## Technologies Used
