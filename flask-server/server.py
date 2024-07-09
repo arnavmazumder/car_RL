@@ -10,6 +10,8 @@ isTraining = False
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.WARNING)
 
+MODEL_NAME = 'agent1'
+
 # Hyperparameters
 hidden_layers=5
 hidden_layer_nodes=5
@@ -180,15 +182,16 @@ def setHyperparams():
 def stopTraining():
     global agent
     global isTraining
+    global MODEL_NAME
 
     isTraining = False
 
-    joblib.dump([agent.losses, agent.rewards, agent.replay_buffer], 'agent1_data.pkl')
+    joblib.dump([agent.losses, agent.rewards, agent.replay_buffer], f'{MODEL_NAME}_data.pkl')
     agent.losses = None
     agent.rewards = None
     agent.replay_buffer = None
 
-    joblib.dump(agent, 'agent1.pkl')
+    joblib.dump(agent, f'{MODEL_NAME}.pkl')
     agent = None
 
     print("Training Stopped")
@@ -200,12 +203,13 @@ def stopTraining():
 @app.route('/api/startAI', methods=['POST'])
 def startAI():
     global agent
+    global MODEL_NAME
 
     # Sanitization
     state = request.get_json()
     if not sanitize(True, state): return {'msg': 'failed'}, 400
 
-    agent = joblib.load('agent1.pkl')
+    agent = joblib.load(f'{MODEL_NAME}.pkl')
 
     newAction = agent.inferAction(state)
 

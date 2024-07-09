@@ -589,17 +589,17 @@ async function gameLoop() {
 
 document.addEventListener('keydown', (event) => {
     if (window.playerRunning) {
-        if (event.key === 'ArrowUp') {
+        if (event.key === 'w') {
             car.accel = 0.1; 
             car.up = true;
         }
 
-        if (event.key === 'ArrowLeft') {
+        if (event.key === 'a') {
             car.rotateSpeed = -0.035; 
             car.left = true;
         }
 
-        if (event.key === 'ArrowRight') {
+        if (event.key === 'd') {
             car.rotateSpeed = 0.035; 
             car.right = true;
         }
@@ -608,15 +608,15 @@ document.addEventListener('keydown', (event) => {
 
 document.addEventListener('keyup', (event) => {
     if (window.playerRunning) {
-        if (event.key === 'ArrowUp'){ 
+        if (event.key === 'w'){ 
             car.accel=0; 
-            car.up = (event.key==='ArrowUp') ? false : car.up;
+            car.up = false;
         }
 
-        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        if (event.key === 'a' || event.key === 'd') {
             car.rotateSpeed = 0;
-            car.left = (event.key==='ArrowLeft') ? false : car.left;
-            car.right = (event.key==='ArrowRight') ? false : car.right;
+            car.left = (event.key==='a') ? false : car.left;
+            car.right = (event.key==='d') ? false : car.right;
         }
     }
 });
@@ -676,7 +676,7 @@ startAIButton.addEventListener('click', () => {
                         } else {
                             
                             window.playerRunning = !clientAiRunning;
-                            startAIButton.textContent = (clientAiRunning) ? 'Stop AI (DQN)' : 'Start AI (DQN)';
+                            startAIButton.textContent = (clientAiRunning) ? 'Stop AI' : 'Start AI';
                             executeAction(data.action);
                             serverAiRunning=true;
                         }
@@ -690,7 +690,7 @@ startAIButton.addEventListener('click', () => {
             .catch(() => console.error("Could not start AI"))
         } else {
             window.playerRunning = !clientAiRunning;
-            startAIButton.textContent = (clientAiRunning) ? 'Stop AI (DQN)' : 'Start AI (DQN)';
+            startAIButton.textContent = (clientAiRunning) ? 'Stop AI' : 'Start AI';
             serverAiRunning = false;
 
             fetch('/api/stopAI', {method:'POST', headers: new Headers({'Content-Type': 'application/json'})})
@@ -719,6 +719,7 @@ trainStopButton.addEventListener('click', () => {
         clientTraining = !clientTraining;
 
         if (clientTraining) {
+            initCar();
             fetch('/api/startTraining', {
                 method: 'POST',
                 body: JSON.stringify({

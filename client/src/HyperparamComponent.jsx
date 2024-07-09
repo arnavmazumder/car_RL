@@ -182,7 +182,6 @@ const HyperparamComponent = () => {
         })
         .then((resp) => {
             if (resp.ok) {
-                onClearClick();
                 setErr({msg:'Successfully updated hyperparameters.', isPos:true});
             } else {
                 setErr({msg:'Failed to update hyperparameters.', isPos:false});

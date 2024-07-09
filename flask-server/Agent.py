@@ -4,8 +4,6 @@ import torch.utils.data
 import torch.nn.functional as F
 import random
 from collections import deque
-import numpy as np
-from sklearn.preprocessing import MinMaxScaler
 
 class Agent:
     def __init__(self, num_hidden_layers, hidden_layer_size, epsilon, eps_decay, min_eps, gamma, targetRefreshRate, batch_size, learning_rate, initial_state, buffer_cap):
