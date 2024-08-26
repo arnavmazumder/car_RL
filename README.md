@@ -108,16 +108,16 @@ Once you have navigated to the game client, you should see a variety of options 
     - For any trained model, you can programmatically access the Agent object (defined in ```Agent.py```), data used to train the agent, and metrics through the saved pickle files in python:
     <br>
 
-        ```python
-        import joblib
+    ```python
+    import joblib
 
-        agent = joblib.load('modelName.pkl')
+    agent = joblib.load('modelName.pkl')
 
-        trainingInfo = joblib.load('modelName_data.pkl')
-        loss_data = trainingInfo[0]
-        reward_data = trainingInfo[1]
-        replay_buffer = trainingInfo[2]
-        ```
+    trainingInfo = joblib.load('modelName_data.pkl')
+    loss_data = trainingInfo[0]
+    reward_data = trainingInfo[1]
+    replay_buffer = trainingInfo[2]
+    ```
     <br>
 
     - To experiment with the game environment dynamics and reward function, please view ```car_RL/client/public/game.js```
